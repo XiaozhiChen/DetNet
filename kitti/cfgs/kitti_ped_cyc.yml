@@ -1,0 +1,15 @@
+EXP_DIR: "kitti_ped_cyc"
+TRAIN:
+  SCALES: !!python/tuple [1295,]
+  MAX_SIZE: 5000
+  FG_THRESH: 0.5
+  BG_THRESH_HI: 0.5
+  BG_THRESH_LO: 0.0
+  BBOX_THRESH: 0.5
+  ORT_THRESH: 0.5
+  IMS_PER_BATCH: 1
+  BATCH_SIZE: 128
+TEST:
+  SCALES: !!python/tuple [1295,]
+  MAX_SIZE: 5000
+  NMS: 0.3
