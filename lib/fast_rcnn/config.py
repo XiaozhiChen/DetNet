@@ -62,13 +62,10 @@ __C.TRAIN.USE_FLIPPED = True
 
 # Train bounding-box regressors
 __C.TRAIN.BBOX_REG = True
-# Train orientation regressors
-__C.TRAIN.ORT_REG = True
 
 # Overlap required between a ROI and ground-truth box in order for that ROI to
 # be used as a bounding-box regression training example
 __C.TRAIN.BBOX_THRESH = 0.5
-__C.TRAIN.ORT_THRESH = 0.5
 
 # Iterations between snapshots
 __C.TRAIN.SNAPSHOT_ITERS = 10000
@@ -80,6 +77,9 @@ __C.TRAIN.SNAPSHOT_INFIX = ''
 # Use a prefetch thread in roi_data_layer.layer
 # So far I haven't found this useful; likely more engineering work is required
 __C.TRAIN.USE_PREFETCH = False
+
+# Train using these proposals
+__C.TRAIN.PROPOSAL_METHOD = 'selective_search'
 
 #
 # Testing options
@@ -104,8 +104,9 @@ __C.TEST.SVM = False
 
 # Test using bounding-box regressors
 __C.TEST.BBOX_REG = True
-# Test using orientation regressors
-__C.TEST.ORT_REG = True
+
+# Test using these proposals
+__C.TEST.PROPOSAL_METHOD = 'selective_search'
 
 #
 # MISC

@@ -8,6 +8,7 @@
 from fast_rcnn.config import cfg
 import datasets
 import datasets.kitti
+import os.path as osp
 import os
 import datasets.imdb
 import xml.dom.minidom as minidom
@@ -20,13 +21,32 @@ import subprocess
 import time
 from utils.cython_bbox import bbox_overlaps, bbox_ioa
 
+def _unique_boxes(boxes, scale=1.0):
+    """Return indices of unique boxes."""
+    v = np.array([1, 1e3, 1e6, 1e9])
+    hashes = np.round(boxes * scale).dot(v)
+    _, index, inv_index = np.unique(hashes, return_index=True,
+                                    return_inverse=True)
+    return index, inv_index
+
+def _validate_boxes(boxes, width=0, height=0):
+    """Check that a set of boxes are valid."""
+    x1 = boxes[:, 0]
+    y1 = boxes[:, 1]
+    x2 = boxes[:, 2]
+    y2 = boxes[:, 3]
+    assert (x1 >= 0).all()
+    assert (y1 >= 0).all()
+    assert (x2 >= x1).all()
+    assert (y2 >= y1).all()
+    assert (x2 < width).all()
+    assert (y2 < height).all()
+
 class kitti(datasets.imdb):
     def __init__(self, image_set, subset, devkit_path=None):
         datasets.imdb.__init__(self, 'kitti_' + subset + '_' + image_set)
         self._image_set = image_set
-        self._subset = subset
-        # self._devkit_path = self._get_default_path() if devkit_path is None \
-                            # else devkit_path
+        self._subset = subset  # car or ped_cyc
         self._data_path = self._get_default_data_path()
         if subset == 'car':
             self._classes = ('__background__', # always index 0
@@ -36,20 +56,22 @@ class kitti(datasets.imdb):
                              'pedestrian', 'cyclist')
         assert self.num_classes >= 2, 'ERROR: incorrect subset'
 
-        # print self._devkit_path, self._data_path
+        print self._data_path
         self._class_to_ind = dict(zip(self.classes, xrange(self.num_classes)))
         self._image_ext = '.png'
         self._image_index = self._load_image_set_index()
         # Default to roidb handler
-        self._roidb_handler = self.selective_search_roidb
+        # self._roidb_handler = self.selective_search_roidb
+        self.set_proposal_method('selective_search')
+        self.competition_mode(False)
 
         # PASCAL specific config options
         self.config = {'cleanup'  : True,
                        'use_salt' : True,
-                       'top_k'    : 2000}
+                       'top_k'    : 5000}
 
-        # assert os.path.exists(self._devkit_path), \
-                # 'VOCdevkit path does not exist: {}'.format(self._devkit_path)
+        self._data_name =  ('test' if image_set == 'test' else 'trainval')
+        self._gt_splits = ('train', 'val', 'trainval')
         assert os.path.exists(self._data_path), \
                 'Path does not exist: {}'.format(self._data_path)
 
@@ -141,67 +163,92 @@ class kitti(datasets.imdb):
         return dontcare_roidb
 
     def selective_search_roidb(self):
-        """
-        Return the database of selective search regions of interest.
-        Ground-truth ROIs are also included.
+        return self._proposal_roidb('selective_search')
 
-        This function loads/saves from/to a cache file to speed up future calls.
-        """
-        cache_file = os.path.join(self.cache_path,
-                                  self.name + '_3DOP_roidb.pkl')
+    def edge_boxes_roidb(self):
+        return self._proposal_roidb('edge_boxes_AR')
 
-        if os.path.exists(cache_file):
+    def mcg_roidb(self):
+        return self._proposal_roidb('MCG')
+
+    def _proposal_roidb(self, method):
+        """
+        Creates a roidb from pre-computed proposals of a particular methods.
+        """
+        top_k = self.config['top_k']
+        cache_file = osp.join(self.cache_path, self.name +
+                              '_{:s}_top{:d}'.format(method, top_k) +
+                              '_roidb.pkl')
+
+        if osp.exists(cache_file):
             with open(cache_file, 'rb') as fid:
                 roidb = cPickle.load(fid)
-            print '{} ss roidb loaded from {}'.format(self.name, cache_file)
+            print '{:s} {:s} roidb loaded from {:s}'.format(self.name, method,
+                                                            cache_file)
             return roidb
 
-        if self._image_set != 'test':
+        if self._image_set in self._gt_splits:
             gt_roidb = self.gt_roidb()
-            ss_roidb = self._load_selective_search_roidb(gt_roidb)
-            roidb = datasets.imdb.merge_roidbs(gt_roidb, ss_roidb)
+            method_roidb = self._load_proposals(method, gt_roidb)
+            roidb = datasets.imdb.merge_roidbs(gt_roidb, method_roidb)
         else:
-            roidb = self._load_selective_search_roidb(None)
+            roidb = self._load_proposals(method, None)
         with open(cache_file, 'wb') as fid:
             cPickle.dump(roidb, fid, cPickle.HIGHEST_PROTOCOL)
-        print 'wrote ss roidb to {}'.format(cache_file)
-
+        print 'wrote {:s} roidb to {:s}'.format(method, cache_file)
         return roidb
 
-    def _load_selective_search_roidb(self, gt_roidb):
-        filename = os.path.abspath(os.path.join(self.cache_path, '..',
-                                                '3DOP',
-                                                self.name + '.mat'))
-        assert os.path.exists(filename), \
-               'Selective search data not found at: {}'.format(filename)
-        raw_boxes = sio.loadmat(filename)['boxes'].ravel()
-
-        # box:[x1 y1 x2 y2]
+    def _load_proposals(self, method, gt_roidb):
+        """
+        Load pre-computed proposals in the format provided by Jan Hosang:
+        http://www.mpi-inf.mpg.de/departments/computer-vision-and-multimodal-
+          computing/research/object-recognition-and-scene-understanding/how-
+          good-are-detection-proposals-really/
+        """
         box_list = []
-        for i in xrange(raw_boxes.shape[0]):
-           box_list.append(raw_boxes[i][:, (1, 0, 3, 2)] - 1)
+        top_k = self.config['top_k']
+        valid_methods = ['MCG', 'selective_search', 'edge_boxes_70',
+                         '3DOP', '3DOP-SL', '3DOP-LS', '3DOP-LL', '3DOP-CA']
+        assert method in valid_methods
 
-        # ignore "DontCare" regions, but it doesn't help
-#        if self._image_set in {'val', 'test'}:
-#            for i in xrange(raw_boxes.shape[0]):
-#                box_list.append(raw_boxes[i][:, (1, 0, 3, 2)] - 1)
-#        else:
-#            # only use samples which have IoU < 0.15 and IoA < 0.1 with "DontCare" regions
-#            dontcare_roidb = self.dontcare_roidb()
-#            assert len(dontcare_roidb) == raw_boxes.shape[0]
-#            for i in xrange(raw_boxes.shape[0]):
-#                dontcare_boxes = dontcare_roidb[i]['boxes']
-#                boxes = raw_boxes[i][:, (1, 0, 3, 2)] - 1
-#                ious = bbox_overlaps(boxes.astype(np.float),
-#                                         dontcare_boxes.astype(np.float))
-#                ioas = bbox_ioa(boxes.astype(np.float),
-#                                dontcare_boxes.astype(np.float))
-#                iou_ioas = (ious < 0.15) & (ioas < 0.1)
-#                I = iou_ioas.all(axis=1)
-#                boxes = boxes[I,:]
-#                box_list.append(boxes)
+        print 'Loading {} boxes'.format(method)
+        for i, index in enumerate(self._image_index):
+            if i % 1000 == 0:
+                print '{:d} / {:d}'.format(i + 1, len(self._image_index))
 
+            if method in ['3DOP', '3DOP-SL', '3DOP-LS', '3DOP-LL']:
+                boxes = np.zeros((0,4), dtype=np.uint16)
+                for ci, c in enumerate(self._classes):
+                    if c == '__background__':
+                        continue
+                    box_file = osp.join(self.cache_path, '..', 'proposals',
+                                        method, c, 'mat',
+                                        self._get_box_file(index))
+                    raw_data = sio.loadmat(box_file)['boxes']
+                    this_boxes = (raw_data[:top_k, :] - 1).astype(np.uint16)
+                    boxes = np.vstack((boxes, this_boxes))
+            else:
+                box_file = osp.join(self.cache_path, '..', 'proposals',
+                                method, 'mat',
+                                self._get_box_file(index))
+                raw_data = sio.loadmat(box_file)['boxes']
+                boxes = (raw_data[:top_k, :] - 1).astype(np.uint16)
+
+            keep, inv_keep = _unique_boxes(boxes)
+            boxes = boxes[keep, :]
+            box_list.append(boxes)
+
+#             im_ann = self._COCO.loadImgs(index)[0]
+            # width = im_ann['width']
+            # height = im_ann['height']
+#             _validate_boxes(boxes, width=width, height=height)
         return self.create_roidb_from_box_list(box_list, gt_roidb)
+
+    def _get_box_file(self, index):
+        # first 14 chars / first 22 chars / all chars + .mat
+        # COCO_val2014_0/COCO_val2014_000000447/COCO_val2014_000000447991.mat
+        file_name = (index + '.mat')
+        return osp.join(self._data_name, index[:4], file_name)
 
     def _load_kitti_annotation(self, index):
         """
@@ -253,7 +300,6 @@ class kitti(datasets.imdb):
                 'gt_overlaps' : overlaps,
                 'alphas' :alphas,
                 'flipped' : False}
-
 
     def _load_dontcare_annotation(self, index):
         """
