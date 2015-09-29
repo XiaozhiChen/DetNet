@@ -30,7 +30,7 @@ for imgId = imgIds.'
     img = coco.loadImgs(imgId);
     img_filename = img.file_name;
     I = imread(sprintf('%s/images/%s/%s',coco_dir,coco_type,img.file_name));
-    if size(I, 2) ~= 3
+    if size(I, 3) ~= 3
         continue;
     end
     bbs = edgeBoxes(I,model,opts);
