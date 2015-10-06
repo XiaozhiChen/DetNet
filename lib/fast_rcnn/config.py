@@ -121,7 +121,7 @@ __C.DEDUP_BOXES = 1./16.
 
 # Pixel mean values (BGR order) as a (1, 1, 3) array
 # These are the values originally used for training VGG16
-__C.PIXEL_MEANS = np.array([[[102.9801, 115.9465, 122.7717]]])
+__C.PIXEL_MEANS = np.array([[[104.0398,114.1145,120.1353]]])
 
 # For reproducibility
 __C.RNG_SEED = 3

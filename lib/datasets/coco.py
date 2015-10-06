@@ -17,7 +17,7 @@ import subprocess
 import json
 
 # Import the COCO API
-_API_PATH = osp.join(datasets.ROOT_DIR, 'data', 'cocoAPI')
+_API_PATH = osp.join(datasets.ROOT_DIR, 'coco', 'cocoAPI')
 sys.path.insert(0, osp.join(_API_PATH, 'PythonAPI'))
 from pycocotools.coco import COCO
 from pycocotools.cocoeval import COCOeval
@@ -56,14 +56,14 @@ class coco(datasets.imdb):
     def __init__(self, image_set, year):
         datasets.imdb.__init__(self, 'coco_' + year + '_' + image_set)
         # COCO specific config options
-        self.config = {'top_k' : 2000,
+        self.config = {'top_k' : 5000,
                        'use_salt' : True,
                        'cleanup' : True,
                        'crowd_thresh' : 0.7}
         # name, paths
         self._year = year
         self._image_set = image_set
-        self._data_path = osp.join(datasets.ROOT_DIR, 'data', 'coco')
+        self._data_path = osp.join(datasets.ROOT_DIR, 'coco')
         # load COCO API, classes, class <-> id mappings
         self._COCO = COCO(self._get_ann_file())
         cats = self._COCO.loadCats(self._COCO.getCatIds())
@@ -152,7 +152,7 @@ class coco(datasets.imdb):
         return self._proposal_roidb('selective_search')
 
     def edge_boxes_roidb(self):
-        return self._proposal_roidb('edge_boxes_70')
+        return self._proposal_roidb('edge_boxes_AR')
 
     def mcg_roidb(self):
         return self._proposal_roidb('MCG')

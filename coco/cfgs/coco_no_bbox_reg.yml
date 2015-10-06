@@ -1,12 +1,12 @@
-EXP_DIR: coco_large_scale
+EXP_DIR: coco_baseline
 TRAIN:
-  SCALES: !!python/tuple [3000]
+  SCALES: [956, 1434, 1912]
   SNAPSHOT_ITERS: 10000
   MAX_SIZE: 3000
   PROPOSAL_METHOD: 'edge_boxes'
-  BBOX_REG: True
+  BBOX_REG: False
 TEST:
-  SCALES: !!python/tuple [3000]
+  SCALES: [956, 1434, 1912]
   MAX_SIZE: 3000
   PROPOSAL_METHOD: 'edge_boxes'
-  BBOX_REG: True
+  BBOX_REG: False
