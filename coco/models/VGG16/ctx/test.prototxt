@@ -1,16 +1,27 @@
 name: "VGG_ILSVRC_16_layers"
+
+input: "data"
+input_shape {
+  dim: 1
+  dim: 3
+  dim: 224
+  dim: 224
+}
+
+input: "rois"
+input_shape {
+  dim: 1 # to be changed on-the-fly to num ROIs
+  dim: 5 # [batch ind, x1, y1, x2, y2] zero-based indexing
+}
 layer {
-  name: 'data'
+  name: 'multi_rois'
   type: 'Python'
-  top: 'data'
-  top: 'rois'
-  top: 'labels'
-  top: 'bbox_targets'
-  top: 'bbox_loss_weights'
+  bottom: 'rois'
+  top: 'context'
   python_param {
     module: 'roi_data_layer.layer'
-    layer: 'RoIDataLayer'
-    param_str: "'num_classes': 21"
+    layer: 'MultiRoIDataLayer'
+    param_str: "'context': 1.5"
   }
 }
 layer {
@@ -141,11 +152,11 @@ layer {
   bottom: "pool2"
   top: "conv3_1"
   param {
-    lr_mult: 0
-    decay_mult: 0
+    lr_mult: 1
+    decay_mult: 1
   }
   param {
-    lr_mult: 0
+    lr_mult: 2
     decay_mult: 0
   }
   convolution_param {
@@ -166,11 +177,11 @@ layer {
   bottom: "conv3_1"
   top: "conv3_2"
   param {
-    lr_mult: 0
-    decay_mult: 0
+    lr_mult: 1
+    decay_mult: 1
   }
   param {
-    lr_mult: 0
+    lr_mult: 2
     decay_mult: 0
   }
   convolution_param {
@@ -191,11 +202,11 @@ layer {
   bottom: "conv3_2"
   top: "conv3_3"
   param {
-    lr_mult: 0
-    decay_mult: 0
+    lr_mult: 1
+    decay_mult: 1
   }
   param {
-    lr_mult: 0
+    lr_mult: 2
     decay_mult: 0
   }
   convolution_param {
@@ -227,11 +238,11 @@ layer {
   bottom: "pool3"
   top: "conv4_1"
   param {
-    lr_mult: 0
-    decay_mult: 0
+    lr_mult: 1
+    decay_mult: 1
   }
   param {
-    lr_mult: 0
+    lr_mult: 2
     decay_mult: 0
   }
   convolution_param {
@@ -252,11 +263,11 @@ layer {
   bottom: "conv4_1"
   top: "conv4_2"
   param {
-    lr_mult: 0
-    decay_mult: 0
+    lr_mult: 1
+    decay_mult: 1
   }
   param {
-    lr_mult: 0
+    lr_mult: 2
     decay_mult: 0
   }
   convolution_param {
@@ -277,11 +288,11 @@ layer {
   bottom: "conv4_2"
   top: "conv4_3"
   param {
-    lr_mult: 0
-    decay_mult: 0
+    lr_mult: 1
+    decay_mult: 1
   }
   param {
-    lr_mult: 0
+    lr_mult: 2
     decay_mult: 0
   }
   convolution_param {
@@ -313,11 +324,11 @@ layer {
   bottom: "pool4"
   top: "conv5_1"
   param {
-    lr_mult: 0
-    decay_mult: 0
+    lr_mult: 1
+    decay_mult: 1
   }
   param {
-    lr_mult: 0
+    lr_mult: 2
     decay_mult: 0
   }
   convolution_param {
@@ -338,11 +349,11 @@ layer {
   bottom: "conv5_1"
   top: "conv5_2"
   param {
-    lr_mult: 0
-    decay_mult: 0
+    lr_mult: 1
+    decay_mult: 1
   }
   param {
-    lr_mult: 0
+    lr_mult: 2
     decay_mult: 0
   }
   convolution_param {
@@ -363,11 +374,11 @@ layer {
   bottom: "conv5_2"
   top: "conv5_3"
   param {
-    lr_mult: 0
-    decay_mult: 0
+    lr_mult: 1
+    decay_mult: 1
   }
   param {
-    lr_mult: 0
+    lr_mult: 2
     decay_mult: 0
   }
   convolution_param {
@@ -400,11 +411,11 @@ layer {
   bottom: "pool5"
   top: "fc6"
   param {
-    lr_mult: 0
-    decay_mult: 0
+    lr_mult: 1
+    decay_mult: 1
   }
   param {
-    lr_mult: 0
+    lr_mult: 2
     decay_mult: 0
   }
   inner_product_param {
@@ -432,11 +443,11 @@ layer {
   bottom: "fc6"
   top: "fc7"
   param {
-    lr_mult: 0
-    decay_mult: 0
+    lr_mult: 1
+    decay_mult: 1
   }
   param {
-    lr_mult: 0
+    lr_mult: 2
     decay_mult: 0
   }
   inner_product_param {
@@ -459,20 +470,103 @@ layer {
   }
 }
 layer {
-  name: "cls_score"
+  name: "roi_pool5_ctx"
+  type: "ROIPooling"
+  bottom: "conv5_3"
+  bottom: "context"
+  top: "pool5_ctx"
+  roi_pooling_param {
+    pooled_w: 7
+    pooled_h: 7
+    spatial_scale: 0.0625 # 1/16
+  }
+}
+layer {
+  name: "fc6_ctx"
   type: "InnerProduct"
-  bottom: "fc7"
-  top: "cls_score"
+  bottom: "pool5_ctx"
+  top: "fc6_ctx"
   param {
-    lr_mult: 0
-    decay_mult: 0
+    lr_mult: 1
+    decay_mult: 1
   }
   param {
-    lr_mult: 0
+    lr_mult: 2
     decay_mult: 0
   }
   inner_product_param {
-    num_output: 21
+    num_output: 4096
+  }
+}
+layer {
+  name: "relu6_ctx"
+  type: "ReLU"
+  bottom: "fc6_ctx"
+  top: "fc6_ctx"
+}
+layer {
+  name: "drop6_ctx"
+  type: "Dropout"
+  bottom: "fc6_ctx"
+  top: "fc6_ctx"
+  dropout_param {
+    dropout_ratio: 0.5
+  }
+}
+layer {
+  name: "fc7_ctx"
+  type: "InnerProduct"
+  bottom: "fc6_ctx"
+  top: "fc7_ctx"
+  param {
+    lr_mult: 1
+    decay_mult: 1
+  }
+  param {
+    lr_mult: 2
+    decay_mult: 0
+  }
+  inner_product_param {
+    num_output: 4096
+  }
+}
+layer {
+  name: "relu7_ctx"
+  type: "ReLU"
+  bottom: "fc7_ctx"
+  top: "fc7_ctx"
+}
+layer {
+  name: "drop7_ctx"
+  type: "Dropout"
+  bottom: "fc7_ctx"
+  top: "fc7_ctx"
+  dropout_param {
+    dropout_ratio: 0.5
+  }
+}
+layer{
+  name: "fc7_output"
+  type: "Concat"
+  bottom: "fc7"
+  bottom: "fc7_ctx"
+  top: "fc7_output"
+}
+layer {
+  name: "cls_score"
+  type: "InnerProduct"
+  bottom: "fc7_output"
+  top: "cls_score"
+  param {
+    lr_mult: 1
+    decay_mult: 1
+  }
+  param {
+    lr_mult: 2
+    decay_mult: 0
+  }
+  inner_product_param {
+    num_output: 81
     weight_filler {
       type: "gaussian"
       std: 0.01
@@ -486,7 +580,7 @@ layer {
 layer {
   name: "bbox_pred"
   type: "InnerProduct"
-  bottom: "fc7"
+  bottom: "fc7_output"
   top: "bbox_pred"
   param {
     lr_mult: 1
@@ -497,7 +591,7 @@ layer {
     decay_mult: 0
   }
   inner_product_param {
-    num_output: 84
+    num_output: 324
     weight_filler {
       type: "gaussian"
       std: 0.001
@@ -509,19 +603,8 @@ layer {
   }
 }
 layer {
-  name: "loss_cls"
-  type: "SoftmaxWithLoss"
+  name: "cls_prob"
+  type: "Softmax"
   bottom: "cls_score"
-  bottom: "labels"
-  top: "loss_cls"
-  loss_weight: 0
-}
-layer {
-  name: "loss_bbox"
-  type: "SmoothL1Loss"
-  bottom: "bbox_pred"
-  bottom: "bbox_targets"
-  bottom: "bbox_loss_weights"
-  top: "loss_bbox"
-  loss_weight: 1
+  top: "cls_prob"
 }

@@ -14,6 +14,17 @@ layer {
   }
 }
 layer {
+  name: 'multi_rois'
+  type: 'Python'
+  bottom: 'rois'
+  top: 'context'
+  python_param {
+    module: 'roi_data_layer.layer'
+    layer: 'MultiRoIDataLayer'
+    param_str: "'context': 1.5"
+  }
+}
+layer {
   name: "conv1"
   type: "Convolution"
   bottom: "data"
@@ -220,15 +231,15 @@ layer {
   bottom: "fc6"
   top: "fc6"
 }
-layer {
-  name: "drop6"
-  type: "Dropout"
-  bottom: "fc6"
-  top: "fc6"
-  dropout_param {
-    dropout_ratio: 0.5
-  }
-}
+#layer {
+#  name: "drop6"
+#  type: "Dropout"
+#  bottom: "fc6"
+#  top: "fc6"
+#  dropout_param {
+#    dropout_ratio: 0.5
+#  }
+#}
 layer {
   name: "fc7"
   type: "InnerProduct"
@@ -252,14 +263,98 @@ layer {
   bottom: "fc7"
   top: "fc7"
 }
+#layer {
+#  name: "drop7"
+#  type: "Dropout"
+#  bottom: "fc7"
+#  top: "fc7"
+#  dropout_param {
+#    dropout_ratio: 0.5
+#  }
+#}
+# context stream
 layer {
-  name: "drop7"
-  type: "Dropout"
-  bottom: "fc7"
-  top: "fc7"
-  dropout_param {
-    dropout_ratio: 0.5
+  name: "roi_pool5_ctx"
+  type: "ROIPooling"
+  bottom: "conv5"
+  bottom: "context"
+  top: "pool5_ctx"
+  roi_pooling_param {
+    pooled_w: 6
+    pooled_h: 6
+    spatial_scale: 0.0625 # 1/16
   }
+}
+layer {
+  name: "fc6_ctx"
+  type: "InnerProduct"
+  bottom: "pool5_ctx"
+  top: "fc6_ctx"
+  param {
+    lr_mult: 1
+    decay_mult: 1
+  }
+  param {
+    lr_mult: 2
+    decay_mult: 0
+  }
+  inner_product_param {
+    num_output: 4096
+  }
+}
+layer {
+  name: "relu6_ctx"
+  type: "ReLU"
+  bottom: "fc6_ctx"
+  top: "fc6_ctx"
+}
+#layer {
+#  name: "drop6_ctx"
+#  type: "Dropout"
+#  bottom: "fc6_ctx"
+#  top: "fc6_ctx"
+#  dropout_param {
+#    dropout_ratio: 0.5
+#  }
+#}
+layer {
+  name: "fc7_ctx"
+  type: "InnerProduct"
+  bottom: "fc6_ctx"
+  top: "fc7_ctx"
+  param {
+    lr_mult: 1
+    decay_mult: 1
+  }
+  param {
+    lr_mult: 2
+    decay_mult: 0
+  }
+  inner_product_param {
+    num_output: 1024
+  }
+}
+layer {
+  name: "relu7_ctx"
+  type: "ReLU"
+  bottom: "fc7_ctx"
+  top: "fc7_ctx"
+}
+#layer {
+#  name: "drop7_ctx"
+#  type: "Dropout"
+#  bottom: "fc7_ctx"
+#  top: "fc7_ctx"
+#  dropout_param {
+#    dropout_ratio: 0.5
+#  }
+#}
+layer{
+  name: "fc7_output"
+  type: "Concat"
+  bottom: "fc7"
+  bottom: "fc7_ctx"
+  top: "fc7_output"
 }
 layer {
   name: "cls_score"

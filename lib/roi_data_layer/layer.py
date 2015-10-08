@@ -115,7 +115,6 @@ class RoIDataLayer(caffe.Layer):
             # thisbinary vector sepcifies the subset of active targets
             top[6].reshape(1, self._num_classes * 1)
 
-
     def forward(self, bottom, top):
         """Get blobs and copy them into this layer's top blob vector."""
         blobs = self._get_next_minibatch()
@@ -175,8 +174,10 @@ class BlobFetcher(Process):
 class MultiRoIDataLayer(caffe.Layer):
     """Multi-ROI layer"""
 
-    # zooming of rois
     def zoom(self, top_data, rho):
+        """
+        zooming of rois
+        """
         assert rho > 0
         dx = (rho - 1) *  (top_data[:,3] - top_data[:,1]) / 2
         dy = (rho - 1) *  (top_data[:,4] - top_data[:,2]) / 2
@@ -192,26 +193,34 @@ class MultiRoIDataLayer(caffe.Layer):
     def central(self, top_data, rho):
         return self.zoom(top_data, rho)
 
-    # crop left region
     def left(self, top_data, rho):
+        """
+        crop left region
+        """
         assert rho > 0
         top_data[:,3] = rho * top_data[:,3] + (1 - rho) * top_data[:,1]
         return top_data
 
-    # crop right region
     def right(self, top_data, rho):
+        """
+        crop right region
+        """
         assert rho > 0
         top_data[:,1] = rho * top_data[:,1] + (1 - rho) * top_data[:,3]
         return top_data
 
-    # crop upper region
     def up(self, top_data, rho):
+        """
+        crop upper region
+        """
         assert rho > 0
         top_data[:,4] = rho * top_data[:,4] + (1 - rho) * top_data[:,2]
         return top_data
 
-    # crop bottom region
     def bottom(self, top_data, rho):
+        """
+        crop bottom region
+        """
         assert rho > 0
         top_data[:,2] = rho * top_data[:,2] + (1 - rho) * top_data[:,4]
         return top_data
