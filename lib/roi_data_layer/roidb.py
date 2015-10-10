@@ -51,9 +51,6 @@ def add_bbox_regression_targets(roidb):
         max_classes = roidb[im_i]['max_classes']
         roidb[im_i]['bbox_targets'] = \
                 _compute_targets(rois, max_overlaps, max_classes)
-        alphas = roidb[im_i]['alphas']
-        roidb[im_i]['ort_targets'] = \
-                _compute_ort_targets(rois, max_overlaps, max_classes, alphas)
 
     # Compute values needed for means and stds
     # var(x) = E(x^2) - E(x)^2
@@ -92,6 +89,7 @@ def _compute_targets(rois, overlaps, labels):
     # Indices of ground-truth ROIs
     gt_inds = np.where(overlaps == 1)[0]
     if len(gt_inds) == 0:
+        # Bail if the image has no ground-truth ROIs
         return np.zeros((rois.shape[0], 5), dtype=np.float32)
 
     # Indices of examples for which we try to make predictions
@@ -128,33 +126,4 @@ def _compute_targets(rois, overlaps, labels):
     targets[ex_inds, 2] = targets_dy
     targets[ex_inds, 3] = targets_dw
     targets[ex_inds, 4] = targets_dh
-    return targets
-
-def _compute_ort_targets(rois, overlaps, labels, alphas):
-    """Compute bounding-box regression targets for an image."""
-    # Ensure ROIs are floats
-    rois = rois.astype(np.float, copy=False)
-
-    # Indices of ground-truth ROIs
-    gt_inds = np.where(overlaps == 1)[0]
-    if len(gt_inds) == 0:
-        return np.zeros((rois.shape[0], 2), dtype=np.float32)
-
-    # Indices of examples for which we try to make predictions
-    ex_inds = np.where(overlaps >= cfg.TRAIN.ORT_THRESH)[0]
-
-    # Get IoU overlap between each ex ROI and gt ROI
-    ex_gt_overlaps = utils.cython_bbox.bbox_overlaps(rois[ex_inds, :],
-                                                     rois[gt_inds, :])
-
-    # Find which gt ROI each ex ROI has max overlap with:
-    # this will be the ex ROI's gt target
-    gt_assignment = ex_gt_overlaps.argmax(axis=1)
-    gt_alphas = alphas[gt_inds[gt_assignment]]
-    ex_alphas = alphas[ex_inds]
-    targets_alpha = gt_alphas - ex_alphas
-
-    targets = np.zeros((rois.shape[0], 2), dtype=np.float32)
-    targets[ex_inds, 0] = labels[ex_inds]
-    targets[ex_inds, 1] = targets_alpha
     return targets

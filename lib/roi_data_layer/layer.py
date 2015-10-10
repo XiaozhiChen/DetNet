@@ -103,18 +103,6 @@ class RoIDataLayer(caffe.Layer):
             # thisbinary vector sepcifies the subset of active targets
             top[4].reshape(1, self._num_classes * 4)
 
-        if cfg.TRAIN.ORT_REG:
-            self._name_to_top_map['ort_targets'] = 5
-            self._name_to_top_map['ort_loss_weights'] = 6
-
-            # orientation_targets blob: R bounding-box regression targets with 4
-            # targets per class
-            top[5].reshape(1, self._num_classes * 1)
-
-            # orientation_loss_weights blob: At most 4 targets per roi are active;
-            # thisbinary vector sepcifies the subset of active targets
-            top[6].reshape(1, self._num_classes * 1)
-
     def forward(self, bottom, top):
         """Get blobs and copy them into this layer's top blob vector."""
         blobs = self._get_next_minibatch()

@@ -1,12 +1,12 @@
-EXP_DIR: coco_ctx
+EXP_DIR: coco_multiscale
 TRAIN:
-  SCALES: !!python/tuple [3000]
-  MAX_SIZE: 5000
+  SCALES: !!python/tuple [956, 1434, 1912]
+  MAX_SIZE: 3000
   PROPOSAL_METHOD: 'edge_boxes'
-  SNAPSHOT_ITERS: 10000
+  SNAPSHOT_ITERS: 40000
   BBOX_REG: True
 TEST:
-  SCALES: !!python/tuple [3000]
-  MAX_SIZE: 5000
+  SCALES: !!python/tuple [956, 1434, 1912]
+  MAX_SIZE: 3000
   PROPOSAL_METHOD: 'edge_boxes'
   BBOX_REG: True
