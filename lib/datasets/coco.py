@@ -157,6 +157,9 @@ class coco(datasets.imdb):
     def mcg_roidb(self):
         return self._proposal_roidb('MCG')
 
+    def deep_boxes_roidb(self):
+        return self._proposal_roidb('deep_boxes')
+
     def _proposal_roidb(self, method):
         """
         Creates a roidb from pre-computed proposals of a particular methods.
@@ -196,7 +199,7 @@ class coco(datasets.imdb):
         box_list = []
         top_k = self.config['top_k']
         valid_methods = ['MCG', 'selective_search',
-                         'edge_boxes_AR', 'edge_boxes_70']
+                         'edge_boxes_AR', 'edge_boxes_70', 'deep_boxes']
         assert method in valid_methods
 
         print 'Loading {} boxes'.format(method)
